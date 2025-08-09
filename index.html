@@ -9,21 +9,21 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; overflow: hidden; background-color: #f0f2f5; }
+        body { font-family: 'Inter', sans-serif; overflow: hidden; }
         #floorplan {
             background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
             background-size: 20px 20px;
             position: relative; width: 100%; height: 100%; overflow: auto;
         }
-        .palette-item { cursor: grab; transition: transform 0.1s ease-in-out, box-shadow 0.2s; }
-        .palette-item:active { cursor: grabbing; transform: scale(1.05); }
+        .palette-item { cursor: grab; transition: transform 0.1s ease-in-out; }
+        .palette-item:active { cursor: grabbing; transform: scale(1.1); }
         .placed-item {
             position: absolute; display: flex; align-items: center; justify-content: center; user-select: none;
-            transition: box-shadow 0.2s, transform 0.2s;
+            border: 2px solid transparent;
         }
         .placed-item.selected {
-            box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.7);
-            transform: scale(1.02);
+            border-color: #fb923c;
+            border-style: dashed;
         }
         .table-shape {
             width: 100%; height: 100%; cursor: grab; display: flex; align-items: flex-start;
@@ -35,88 +35,81 @@
         .details-container { display: flex; width: 100%; height: 100%; font-size: 10px; line-height: 1.3; pointer-events: none; }
         .details-column { width: 50%; word-break: break-word; }
         .details-column p { margin-bottom: 2px; }
-        .placed-item .delete-icon, .placed-item .resize-handle { display: none; z-index: 10; opacity: 0; transition: opacity 0.2s; }
-        .placed-item:hover .delete-icon, .placed-item:hover .resize-handle { display: flex; opacity: 1; }
+        .placed-item .delete-icon, .placed-item .resize-handle { display: none; z-index: 10; }
+        .placed-item:hover .delete-icon, .placed-item:hover .resize-handle { display: block; }
         .placed-item .delete-icon {
-            position: absolute; top: -10px; right: -10px; width: 24px; height: 24px;
+            position: absolute; top: -8px; right: -8px; width: 20px; height: 20px;
             background-color: #ef4444; color: white; border-radius: 50%;
             align-items: center; justify-content: center; cursor: pointer; font-size: 14px; line-height: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
         .placed-item .resize-handle {
-            position: absolute; width: 14px; height: 14px; background-color: white;
-            border: 2px solid #007aff; border-radius: 50%;
-            bottom: -7px; right: -7px; cursor: se-resize;
+            position: absolute; width: 12px; height: 12px; background-color: white;
+            border: 2px solid #3b82f6; border-radius: 2px;
+            bottom: -6px; right: -6px; cursor: se-resize;
         }
-        .modal-backdrop { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.2); z-index: 40; transition: opacity 0.3s; }
-        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; transition: transform 0.3s, opacity 0.3s; }
+        .modal-backdrop { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 40; }
+        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; }
         .modal.show, .modal-backdrop.show { display: block; }
-        .favorite-star { cursor: pointer; color: #d1d5db; transition: color 0.2s; }
+        .favorite-star { cursor: pointer; color: #d1d5db; }
         .favorite-star.favorited { color: #facc15; }
-        .glass-effect {
-            background-color: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 h-screen flex flex-col">
 
     <!-- Header -->
-    <header class="bg-white/80 backdrop-blur-lg border-b border-gray-200/80 p-4 flex justify-between items-center z-20">
+    <header class="bg-white shadow-md p-3 flex justify-between items-center z-20">
         <div class="flex items-center gap-4">
             <h1 class="text-xl font-bold text-gray-900">Pub Floor Plan Organizer</h1>
-            <div id="total-revenue-container" class="bg-green-100 text-green-800 font-bold text-lg px-4 py-1 rounded-full">
+            <div id="total-revenue-container" class="bg-green-100 text-green-800 font-bold text-lg px-4 py-1 rounded-md">
                 Total Revenue: $<span id="total-revenue">0.00</span>
             </div>
         </div>
-        <div class="flex items-center gap-3">
-            <select id="floorplan-selector" class="block w-full max-w-xs px-4 py-2 bg-gray-100 border-transparent rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm">
+        <div class="flex items-center gap-4">
+            <select id="floorplan-selector" class="block w-full max-w-xs px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                 <option id="loading-option" value="">Loading plans...</option>
             </select>
-            <button id="manage-menu-btn" class="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-full shadow-sm hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Manage Menu</button>
-            <button id="new-plan-btn" class="bg-blue-500 text-white font-semibold py-2 px-4 rounded-full shadow-sm hover:bg-blue-600">New Plan</button>
-            <button id="delete-plan-btn" class="bg-red-500 text-white font-semibold py-2 px-4 rounded-full shadow-sm hover:bg-red-600">Delete Plan</button>
+            <button id="manage-menu-btn" class="bg-gray-500 text-white font-semibold py-2 px-4 rounded-md shadow-sm hover:bg-gray-600 opacity-50 cursor-not-allowed" disabled>Manage Menu</button>
+            <button id="new-plan-btn" class="bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md shadow-sm hover:bg-indigo-700">New Plan</button>
+            <button id="delete-plan-btn" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-md shadow-sm hover:bg-red-700">Delete Plan</button>
         </div>
     </header>
 
     <!-- Main Content -->
     <div class="flex flex-grow overflow-hidden">
-        <aside id="palette" class="w-56 glass-effect p-4 overflow-y-auto">
-            <h2 class="text-lg font-semibold mb-4 text-gray-800 px-2">Objects</h2>
+        <aside id="palette" class="w-48 bg-white p-4 overflow-y-auto shadow-lg">
+            <h2 class="text-lg font-semibold mb-4 text-gray-800">Objects</h2>
             <div class="space-y-4">
-                <div class="palette-item text-center" draggable="true" data-type="square-table"><div class="w-16 h-16 bg-blue-500 rounded-2xl mx-auto shadow-md"></div><p class="text-sm mt-2 font-medium">Square Table</p></div>
-                <div class="palette-item text-center" draggable="true" data-type="round-table"><div class="w-16 h-16 bg-purple-500 rounded-full mx-auto shadow-md"></div><p class="text-sm mt-2 font-medium">Round Table</p></div>
-                <div class="palette-item text-center" draggable="true" data-type="chair"><div class="w-8 h-8 bg-gray-600 rounded-lg mx-auto shadow-md"></div><p class="text-sm mt-2 font-medium">Chair</p></div>
-                <div class="palette-item text-center" draggable="true" data-type="bar"><div class="w-full h-8 bg-yellow-500 rounded-lg mx-auto shadow-md"></div><p class="text-sm mt-2 font-medium">Bar Section</p></div>
+                <div class="palette-item text-center" draggable="true" data-type="square-table"><div class="w-16 h-16 bg-blue-500 rounded-md mx-auto"></div><p class="text-sm mt-1">Square Table</p></div>
+                <div class="palette-item text-center" draggable="true" data-type="round-table"><div class="w-16 h-16 bg-purple-500 rounded-full mx-auto"></div><p class="text-sm mt-1">Round Table</p></div>
+                <div class="palette-item text-center" draggable="true" data-type="chair"><div class="w-8 h-8 bg-gray-600 rounded-md mx-auto"></div><p class="text-sm mt-1">Chair</p></div>
+                <div class="palette-item text-center" draggable="true" data-type="bar"><div class="w-full h-8 bg-yellow-500 rounded-md mx-auto"></div><p class="text-sm mt-1">Bar Section</p></div>
             </div>
-            <hr class="my-6 border-gray-300/50">
-            <h2 class="text-lg font-semibold mb-4 text-gray-800 px-2">Templates</h2>
+            <hr class="my-4">
+            <h2 class="text-lg font-semibold mb-4 text-gray-800">Templates</h2>
             <div id="template-palette" class="space-y-4">
-                <p class="text-xs text-gray-500 px-2">Save a table's size from its detail window to create a template.</p>
+                <p class="text-xs text-gray-500">Save a table's size from its detail window to create a template.</p>
             </div>
         </aside>
-        <main id="floorplan" class="flex-grow"></main>
+        <main id="floorplan" class="flex-grow bg-gray-200"></main>
     </div>
 
     <!-- Modals -->
     <div id="new-plan-modal-backdrop" class="modal-backdrop" data-action="close-modal"></div>
-    <div id="new-plan-modal" class="modal glass-effect p-6 rounded-3xl shadow-2xl w-11/12 max-w-md">
+    <div id="new-plan-modal" class="modal bg-white p-6 rounded-xl shadow-lg w-11/12 max-w-md">
         <h2 class="text-2xl font-semibold mb-4">Create New Floor Plan</h2>
         <form id="new-plan-form">
-            <div class="mb-4"><label for="plan-name" class="block text-sm font-medium text-gray-700">Pub Name</label><input type="text" id="plan-name" required class="mt-1 block w-full px-4 py-2 border border-gray-300/50 bg-white/50 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., The Prancing Pony"></div>
-            <div class="flex justify-end gap-4"><button type="button" data-action="close-modal" class="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-full hover:bg-gray-300">Cancel</button><button type="submit" class="bg-blue-500 text-white font-semibold py-2 px-4 rounded-full hover:bg-blue-600">Create</button></div>
+            <div class="mb-4"><label for="plan-name" class="block text-sm font-medium text-gray-700">Pub Name</label><input type="text" id="plan-name" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="e.g., The Prancing Pony"></div>
+            <div class="flex justify-end gap-4"><button type="button" data-action="close-modal" class="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-md hover:bg-gray-300">Cancel</button><button type="submit" class="bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-indigo-700">Create</button></div>
         </form>
     </div>
 
     <div id="table-details-modal-backdrop" class="modal-backdrop" data-action="close-modal"></div>
-    <div id="table-details-modal" class="modal glass-effect p-6 rounded-3xl shadow-2xl w-11/12 max-w-2xl">
+    <div id="table-details-modal" class="modal bg-white p-6 rounded-xl shadow-lg w-11/12 max-w-2xl">
         <div class="flex justify-between items-start">
             <h2 id="table-details-title" class="text-2xl font-semibold mb-4">Table Details</h2>
             <div>
                 <label for="table-status" class="block text-xs font-medium text-gray-600">Status</label>
-                <select id="table-status" class="mt-1 block w-full px-3 py-2 border border-gray-300/50 bg-white/50 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select id="table-status" class="mt-1 block w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm text-sm">
                     <option value="Open">Open</option>
                     <option value="Reserved">Reserved</option>
                     <option value="Needs Cleaning">Needs Cleaning</option>
@@ -127,57 +120,57 @@
             <!-- Attendees Section -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Attendees</label>
-                <div id="attendee-list" class="space-y-2 mb-2 max-h-40 overflow-y-auto p-2 border border-gray-300/50 bg-white/20 rounded-xl"></div>
+                <div id="attendee-list" class="space-y-2 mb-2 max-h-40 overflow-y-auto p-2 border rounded-md"></div>
                 <form id="add-attendee-form" class="flex gap-2 items-end">
                     <div class="flex-grow">
                         <label for="new-attendee-name" class="block text-xs font-medium text-gray-600">New Attendee Name</label>
-                        <input type="text" id="new-attendee-name" class="mt-1 block w-full px-3 py-2 border border-gray-300/50 bg-white/50 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Jane Doe">
+                        <input type="text" id="new-attendee-name" class="mt-1 block w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm text-sm" placeholder="Jane Doe">
                     </div>
-                    <button type="submit" class="bg-blue-500 text-white font-semibold py-2 px-4 rounded-full hover:bg-blue-600 h-full">Add</button>
+                    <button type="submit" class="bg-blue-500 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-600 h-full">Add</button>
                 </form>
             </div>
             <!-- Orders Section -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Orders</label>
                 <div id="quick-add-container" class="flex flex-wrap gap-1 mb-2"></div>
-                <div id="order-list" class="space-y-2 mb-2 max-h-40 overflow-y-auto p-2 border border-gray-300/50 bg-white/20 rounded-xl"></div>
+                <div id="order-list" class="space-y-2 mb-2 max-h-40 overflow-y-auto p-2 border rounded-md"></div>
                 <form id="add-order-form" class="flex gap-2 items-end">
                     <div class="flex-grow">
                         <label for="new-order-item" class="block text-xs font-medium text-gray-600">New Order</label>
-                        <select id="new-order-item" class="mt-1 block w-full px-3 py-2 border border-gray-300/50 bg-white/50 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                        <select id="new-order-item" class="mt-1 block w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm text-sm"></select>
                     </div>
-                    <button type="submit" class="bg-green-500 text-white font-semibold py-2 px-4 rounded-full hover:bg-green-600 h-full">Add</button>
+                    <button type="submit" class="bg-green-500 text-white font-semibold py-2 px-4 rounded-md hover:bg-green-600 h-full">Add</button>
                 </form>
             </div>
         </div>
         <div class="flex justify-between items-center mt-6">
             <div>
-                <button type="button" id="clear-table-btn" class="bg-red-500 text-white font-semibold py-2 px-4 rounded-full hover:bg-red-600">Clear Table</button>
-                <button type="button" id="save-template-btn" class="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-full hover:bg-yellow-600 ml-2">Save as Template</button>
+                <button type="button" id="clear-table-btn" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-red-700">Clear Table</button>
+                <button type="button" id="save-template-btn" class="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-md hover:bg-yellow-600 ml-2">Save as Template</button>
             </div>
-            <button type="button" data-action="close-modal" class="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-full hover:bg-gray-300">Close</button>
+            <button type="button" data-action="close-modal" class="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-md hover:bg-gray-300">Close</button>
         </div>
     </div>
 
     <div id="menu-modal-backdrop" class="modal-backdrop" data-action="close-modal"></div>
-    <div id="menu-modal" class="modal glass-effect p-6 rounded-3xl shadow-2xl w-11/12 max-w-lg">
+    <div id="menu-modal" class="modal bg-white p-6 rounded-xl shadow-lg w-11/12 max-w-lg">
         <h2 class="text-2xl font-semibold mb-4">Manage Menu</h2>
         <div class="mb-4">
-            <div id="menu-item-list" class="space-y-2 mb-2 max-h-40 overflow-y-auto p-2 border border-gray-300/50 bg-white/20 rounded-xl"></div>
+            <div id="menu-item-list" class="space-y-2 mb-2 max-h-40 overflow-y-auto p-2 border rounded-md"></div>
             <form id="add-menu-item-form" class="grid grid-cols-3 gap-2 items-end">
                 <div class="col-span-1">
                     <label for="new-menu-item-name" class="block text-xs font-medium text-gray-600">Item Name</label>
-                    <input type="text" id="new-menu-item-name" class="mt-1 block w-full px-3 py-2 border border-gray-300/50 bg-white/50 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Burger">
+                    <input type="text" id="new-menu-item-name" class="mt-1 block w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm text-sm" placeholder="Burger">
                 </div>
                 <div class="col-span-1">
                      <label for="new-menu-item-price" class="block text-xs font-medium text-gray-600">Price</label>
-                    <input type="number" step="0.01" id="new-menu-item-price" class="mt-1 block w-full px-3 py-2 border border-gray-300/50 bg-white/50 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="14.00">
+                    <input type="number" step="0.01" id="new-menu-item-price" class="mt-1 block w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm text-sm" placeholder="14.00">
                 </div>
-                <button type="submit" class="bg-green-500 text-white font-semibold py-2 px-4 rounded-full hover:bg-green-600 h-full">Add Item</button>
+                <button type="submit" class="bg-green-500 text-white font-semibold py-2 px-4 rounded-md hover:bg-green-600 h-full">Add Item</button>
             </form>
         </div>
         <div class="flex justify-end items-center mt-6">
-            <button type="button" data-action="close-modal" class="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-full hover:bg-gray-300">Done</button>
+            <button type="button" data-action="close-modal" class="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-md hover:bg-gray-300">Done</button>
         </div>
     </div>
     
@@ -188,27 +181,7 @@
 
         // --- CONFIG & STATE ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-floorplan-app';
-        // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyC7syeIjI5ZMaEr7Vnj1qPT8JDQOvuWFbY",
-  authDomain: "mcpc-pla.firebaseapp.com",
-  projectId: "mcpc-pla",
-  storageBucket: "mcpc-pla.firebasestorage.app",
-  messagingSenderId: "777736794716",
-  appId: "1:777736794716:web:0d77ce2eed14b731232c99",
-  measurementId: "G-GJ3ZL1K3Z6"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         setLogLevel('debug');
 
@@ -333,7 +306,7 @@ const analytics = getAnalytics(app);
                         }
                 }
                 shapeEl.style.backgroundColor = bgColor;
-                shapeEl.classList.add(obj.type === 'round-table' ? 'rounded-full' : 'rounded-2xl');
+                shapeEl.classList.add(obj.type === 'round-table' ? 'rounded-full' : 'rounded-md');
 
                 if (isTable) {
                     const resizeHandle = document.createElement('div');
@@ -398,7 +371,7 @@ const analytics = getAnalytics(app);
             const container = document.getElementById('template-palette');
             container.innerHTML = '';
             if (!templates || templates.length === 0) {
-                 container.innerHTML = '<p class="text-xs text-gray-500 px-2">Save a table\'s size from its detail window to create a template.</p>';
+                 container.innerHTML = '<p class="text-xs text-gray-500">Save a table\'s size from its detail window to create a template.</p>';
                  return;
             }
             templates.forEach(template => {
@@ -414,11 +387,11 @@ const analytics = getAnalytics(app);
                 if (template.type === 'round-table') {
                     shape.classList.add('bg-purple-500', 'rounded-full');
                 } else {
-                    shape.classList.add('bg-blue-500', 'rounded-2xl');
+                    shape.classList.add('bg-blue-500', 'rounded-md');
                 }
                 
                 const p = document.createElement('p');
-                p.className = 'text-sm mt-2 font-medium';
+                p.className = 'text-sm mt-1';
                 p.textContent = template.name;
                 
                 div.appendChild(shape);
@@ -430,11 +403,7 @@ const analytics = getAnalytics(app);
         // --- INTERACTION LOGIC ---
         floorplanEl.addEventListener('mousedown', (e) => {
             const targetItem = e.target.closest('.placed-item');
-            if (!targetItem) {
-                selectedObjectId = null;
-                renderFloorplan(currentPlanObjects);
-                return;
-            }
+            if (!targetItem) return;
 
             const activeItemId = targetItem.dataset.id;
             if (e.target.classList.contains('delete-icon')) {
