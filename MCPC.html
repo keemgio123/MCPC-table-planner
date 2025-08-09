@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pub Floor Plan Organizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; overflow: hidden; background-color: #f0f2f5; }
+        #floorplan {
+            background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
+            background-size: 20px 20px;
+            position: relative; width: 100%; height: 100%; overflow: auto;
+        }
+        .palette-item { cursor: grab; transition: transform 0.1s ease-in-out, box-shadow 0.2s; }
+        .palette-item:active { cursor: grabbing; transform: scale(1.05); }
+        .placed-item {
+            position: absolute; display: flex; align-items: center; justify-content: center; user-select: none;
+            transition: box-shadow 0.2s, transform 0.2s;
+        }
+        .placed-item.selected {
+            box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.7);
+            transform: scale(1.02);
+        }
+        .table-shape {
+            width: 100%; height: 100%; cursor: grab; display: flex; align-items: flex-start;
+            justify-content: center; color: white; padding: 4px; overflow: auto;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            transition: background-color 0.3s;
+        }
+        .table-shape:active { cursor: grabbing; }
+        .details-container { display: flex; width: 100%; height: 100%; font-size: 10px; line-height: 1.3; pointer-events: none; }
+        .details-column { width: 50%; word-break: break-word; }
+        .details-column p { margin-bottom: 2px; }
+        .placed-item .delete-icon, .placed-item .resize-handle { display: none; z-index: 10; opacity: 0; transition: opacity 0.2s; }
+        .placed-item:hover .delete-icon, .placed-item:hover .resize-handle { display: flex; opacity: 1; }
+        .placed-item .delete-icon {
+            position: absolute; top: -10px; right: -10px; width: 24px; height: 24px;
+            background-color: #ef4444; color: white; border-radius: 50%;
+            align-items: center; justify-content: center; cursor: pointer; font-size: 14px; line-height: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .placed-item .resize-handle {
+            position: absolute; width: 14px; height: 14px; background-color: white;
+            border: 2px solid #007aff; border-radius: 50%;
+            bottom: -7px; right: -7px; cursor: se-resize;
+        }
+        .modal-backdrop { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.2); z-index: 40; transition: opacity 0.3s; }
+        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; transition: transform 0.3s, opacity 0.3s; }
+        .modal.show, .modal-backdrop.show { display: block; }
+        .favorite-star { cursor: pointer; color: #d1d5db; transition: color 0.2s; }
+        .favorite-star.favorited { color: #facc15; }
+        .glass-effect {
+            background-color: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white/80 backdrop-blur-lg border-b border-gray-200/80 p-4 flex justify-between items-center z-20">
+        <div class="flex items-center gap-4">
+            <h1 class="text-xl font-bold text-gray-900">Pub Floor Plan Organizer</h1>
+            <div id="total-revenue-container" class="bg-green-100 text-green-800 font-bold text-lg px-4 py-1 rounded-full">
+                Total Revenue: $<span id="total-revenue">0.00</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <select id="floorplan-selector" class="block w-full max-w-xs px-4 py-2 bg-gray-100 border-transparent rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm">
+                <option id="loading-option" value="">Loading plans...</option>
+            </select>
+            <button id="manage-menu-btn" class="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-full shadow-sm hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Manage Menu</button>
+            <button id="new-plan-btn" class="bg-blue-500 text-white font-semibold py-2 px-4 rounded-full shadow-sm hover:bg-blue-600">New Plan</button>
+            <button id="delete-plan-btn" class="bg-red-500 text-white font-semibold py-2 px-4 rounded-full shadow-sm hover:bg-red-600">Delete Plan</button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="flex flex-grow overflow-hidden">
+        <aside id="palette" class="w-56 glass-effect p-4 overflow-y-auto">
+            <h2 class="text-lg font-semibold mb-4 text-gray-800 px-2">Objects</h2>
+            <div class="space-y-4">
+                <div class="palette-item text-center" draggable="true" data-type="square-table"><div class="w-16 h-16 bg-blue-500 rounded-2xl mx-auto shadow-md"></div><p class="text-sm mt-2 font-medium">Square Table</p></div>
+                <div class="palette-item text-center" draggable="true" data-type="round-table"><div class="w-16 h-16 bg-purple-500 rounded-full mx-auto shadow-md"></div><p class="text-sm mt-2 font-medium">Round Table</p></div>
+                <div class="palette-item text-center" draggable="true" data-type="chair"><div class="w-8 h-8 bg-gray-600 rounded-lg mx-auto shadow-md"></div><p class="text-sm mt-2 font-medium">Chair</p></div>
+                <div class="palette-item text-center" draggable="true" data-type="bar"><div class="w-full h-8 bg-yellow-500 rounded-lg mx-auto shadow-md"></div><p class="text-sm mt-2 font-medium">Bar Section</p></div>
+            </div>
+            <hr class="my-6 border-gray-300/50">
+            <h2 class="text-lg font-semibold mb-4 text-gray-800 px-2">Templates</h2>
+            <div id="template-palette" class="space-y-4">
+                <p class="text-xs text-gray-500 px-2">Save a table's size from its detail window to create a template.</p>
+            </div>
+        </aside>
+        <main id="floorplan" class="flex-grow"></main>
+    </div>
+
+    <!-- Modals -->
+    <div id="new-plan-modal-backdrop" class="modal-backdrop" data-action="close-modal"></div>
+    <div id="new-plan-modal" class="modal glass-effect p-6 rounded-3xl shadow-2xl w-11/12 max-w-md">
+        <h2 class="text-2xl font-semibold mb-4">Create New Floor Plan</h2>
+        <form id="new-plan-form">
+            <div class="mb-4"><label for="plan-name" class="block text-sm font-medium text-gray-700">Pub Name</label><input type="text" id="plan-name" required class="mt-1 block w-full px-4 py-2 border border-gray-300/50 bg-white/50 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., The Prancing Pony"></div>
+            <div class="flex justify-end gap-4"><button type="button" data-action="close-modal" class="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-full hover:bg-gray-300">Cancel</button><button type="submit" class="bg-blue-500 text-white font-semibold py-2 px-4 rounded-full hover:bg-blue-600">Create</button></div>
+        </form>
+    </div>
+
+    <div id="table-details-modal-backdrop" class="modal-backdrop" data-action="close-modal"></div>
+    <div id="table-details-modal" class="modal glass-effect p-6 rounded-3xl shadow-2xl w-11/12 max-w-2xl">
+        <div class="flex justify-between items-start">
+            <h2 id="table-details-title" class="text-2xl font-semibold mb-4">Table Details</h2>
+            <div>
+                <label for="table-status" class="block text-xs font-medium text-gray-600">Status</label>
+                <select id="table-status" class="mt-1 block w-full px-3 py-2 border border-gray-300/50 bg-white/50 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="Open">Open</option>
+                    <option value="Reserved">Reserved</option>
+                    <option value="Needs Cleaning">Needs Cleaning</option>
+                </select>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+            <!-- Attendees Section -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Attendees</label>
+                <div id="attendee-list" class="space-y-2 mb-2 max-h-40 overflow-y-auto p-2 border border-gray-300/50 bg-white/20 rounded-xl"></div>
+                <form id="add-attendee-form" class="flex gap-2 items-end">
+                    <div class="flex-grow">
+                        <label for="new-attendee-name" class="block text-xs font-medium text-gray-600">New Attendee Name</label>
+                        <input type="text" id="new-attendee-name" class="mt-1 block w-full px-3 py-2 border border-gray-300/50 bg-white/50 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Jane Doe">
+                    </div>
+                    <button type="submit" class="bg-blue-500 text-white font-semibold py-2 px-4 rounded-full hover:bg-blue-600 h-full">Add</button>
+                </form>
+            </div>
+            <!-- Orders Section -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Orders</label>
+                <div id="quick-add-container" class="flex flex-wrap gap-1 mb-2"></div>
+                <div id="order-list" class="space-y-2 mb-2 max-h-40 overflow-y-auto p-2 border border-gray-300/50 bg-white/20 rounded-xl"></div>
+                <form id="add-order-form" class="flex gap-2 items-end">
+                    <div class="flex-grow">
+                        <label for="new-order-item" class="block text-xs font-medium text-gray-600">New Order</label>
+                        <select id="new-order-item" class="mt-1 block w-full px-3 py-2 border border-gray-300/50 bg-white/50 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                    </div>
+                    <button type="submit" class="bg-green-500 text-white font-semibold py-2 px-4 rounded-full hover:bg-green-600 h-full">Add</button>
+                </form>
+            </div>
+        </div>
+        <div class="flex justify-between items-center mt-6">
+            <div>
+                <button type="button" id="clear-table-btn" class="bg-red-500 text-white font-semibold py-2 px-4 rounded-full hover:bg-red-600">Clear Table</button>
+                <button type="button" id="save-template-btn" class="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-full hover:bg-yellow-600 ml-2">Save as Template</button>
+            </div>
+            <button type="button" data-action="close-modal" class="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-full hover:bg-gray-300">Close</button>
+        </div>
+    </div>
+
+    <div id="menu-modal-backdrop" class="modal-backdrop" data-action="close-modal"></div>
+    <div id="menu-modal" class="modal glass-effect p-6 rounded-3xl shadow-2xl w-11/12 max-w-lg">
+        <h2 class="text-2xl font-semibold mb-4">Manage Menu</h2>
+        <div class="mb-4">
+            <div id="menu-item-list" class="space-y-2 mb-2 max-h-40 overflow-y-auto p-2 border border-gray-300/50 bg-white/20 rounded-xl"></div>
+            <form id="add-menu-item-form" class="grid grid-cols-3 gap-2 items-end">
+                <div class="col-span-1">
+                    <label for="new-menu-item-name" class="block text-xs font-medium text-gray-600">Item Name</label>
+                    <input type="text" id="new-menu-item-name" class="mt-1 block w-full px-3 py-2 border border-gray-300/50 bg-white/50 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Burger">
+                </div>
+                <div class="col-span-1">
+                     <label for="new-menu-item-price" class="block text-xs font-medium text-gray-600">Price</label>
+                    <input type="number" step="0.01" id="new-menu-item-price" class="mt-1 block w-full px-3 py-2 border border-gray-300/50 bg-white/50 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="14.00">
+                </div>
+                <button type="submit" class="bg-green-500 text-white font-semibold py-2 px-4 rounded-full hover:bg-green-600 h-full">Add Item</button>
+            </form>
+        </div>
+        <div class="flex justify-end items-center mt-6">
+            <button type="button" data-action="close-modal" class="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-full hover:bg-gray-300">Done</button>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, doc, updateDoc, deleteDoc, query, setLogLevel, addDoc, getDocs, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- CONFIG & STATE ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-floorplan-app';
+        // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyC7syeIjI5ZMaEr7Vnj1qPT8JDQOvuWFbY",
+  authDomain: "mcpc-pla.firebaseapp.com",
+  projectId: "mcpc-pla",
+  storageBucket: "mcpc-pla.firebasestorage.app",
+  messagingSenderId: "777736794716",
+  appId: "1:777736794716:web:0d77ce2eed14b731232c99",
+  measurementId: "G-GJ3ZL1K3Z6"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        setLogLevel('debug');
+
+        let currentPlanId = null;
+        let currentPlanObjects = [];
+        let currentPlanMenu = [];
+        let currentPlanTemplates = [];
+        let activeTableId = null;
+        let selectedObjectId = null;
+        let clipboard = null;
+        let unsubscribeFromPlan = () => {};
+
+        // --- FIREBASE INIT ---
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const floorplansCollectionRef = collection(db, `artifacts/${appId}/public/data/floorplans`);
+
+        // --- DOM ELEMENTS ---
+        const floorplanEl = document.getElementById('floorplan');
+        const selectorEl = document.getElementById('floorplan-selector');
+        
+        // --- FLOOR PLAN MANAGEMENT ---
+        async function loadFloorplans() {
+            const manageMenuBtn = document.getElementById('manage-menu-btn');
+            try {
+                const snapshot = await getDocs(query(floorplansCollectionRef));
+                selectorEl.innerHTML = '';
+                if (snapshot.empty) {
+                    selectorEl.innerHTML = '<option value="">No plans yet. Create one!</option>';
+                    floorplanEl.innerHTML = '<p class="text-center text-gray-500 p-8">Create a new floor plan to get started.</p>';
+                    manageMenuBtn.disabled = true;
+                    manageMenuBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    manageMenuBtn.disabled = false;
+                    manageMenuBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    snapshot.forEach(doc => {
+                        const option = document.createElement('option');
+                        option.value = doc.id;
+                        option.textContent = doc.data().name;
+                        selectorEl.appendChild(option);
+                    });
+                    if (selectorEl.options.length > 0) switchFloorplan(selectorEl.options[0].value);
+                }
+            } catch (error) {
+                console.error("Error loading floorplans:", error);
+                floorplanEl.innerHTML = `<p class="text-center text-red-500 p-8">Error loading data.</p>`;
+            }
+        }
+
+        function switchFloorplan(planId) {
+            if (currentPlanId === planId) return;
+            currentPlanId = planId;
+            selectorEl.value = planId;
+            unsubscribeFromPlan();
+            const planDocRef = doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId);
+            unsubscribeFromPlan = onSnapshot(planDocRef, (doc) => {
+                if (doc.exists()) {
+                    const planData = doc.data();
+                    currentPlanObjects = planData.objects || [];
+                    currentPlanMenu = planData.menu || [];
+                    currentPlanTemplates = planData.templates || [];
+                    
+                    renderFloorplan(currentPlanObjects);
+                    renderTemplatePalette(currentPlanTemplates);
+
+                    const detailsModal = document.getElementById('table-details-modal');
+                    if (detailsModal.classList.contains('show') && activeTableId) {
+                        const activeTable = currentPlanObjects.find(obj => obj.id === activeTableId);
+                        if (activeTable) {
+                            renderAttendeeDetailsList(activeTable.attendees || []);
+                            renderOrderDetailsList(activeTable.orders || []);
+                        } else {
+                            hideAllModals();
+                        }
+                    }
+                    
+                    const menuModal = document.getElementById('menu-modal');
+                    if (menuModal.classList.contains('show')) {
+                        renderMenuList(currentPlanMenu);
+                    }
+                } else {
+                    currentPlanId = null;
+                    loadFloorplans();
+                }
+            });
+        }
+        selectorEl.addEventListener('change', (e) => switchFloorplan(e.target.value));
+
+        // --- RENDERING ---
+        function renderFloorplan(objects) {
+            floorplanEl.innerHTML = '';
+            let grandTotal = 0;
+
+            objects.forEach(obj => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'placed-item';
+                if (obj.id === selectedObjectId) itemEl.classList.add('selected');
+                itemEl.style.left = `${obj.x}px`;
+                itemEl.style.top = `${obj.y}px`;
+                itemEl.dataset.id = obj.id;
+
+                const isTable = obj.type === 'square-table' || obj.type === 'round-table';
+                const width = obj.width || (isTable ? 60 : (obj.type === 'chair' ? 25 : 150));
+                const height = obj.height || (isTable ? 60 : (obj.type === 'chair' ? 25 : 40));
+                itemEl.style.width = `${width}px`;
+                itemEl.style.height = `${height}px`;
+
+                const shapeEl = document.createElement('div');
+                shapeEl.className = 'table-shape';
+
+                let bgColor = '';
+                switch (obj.status) {
+                    case 'Reserved': bgColor = '#f59e0b'; break; // Orange
+                    case 'Needs Cleaning': bgColor = '#ef4444'; break; // Red
+                    default: // Open status or not a table
+                        switch (obj.type) {
+                            case 'square-table': bgColor = '#3b82f6'; break;
+                            case 'round-table': bgColor = '#8b5cf6'; break;
+                            case 'chair': bgColor = '#4b5563'; break;
+                            case 'bar': bgColor = '#d97706'; break;
+                        }
+                }
+                shapeEl.style.backgroundColor = bgColor;
+                shapeEl.classList.add(obj.type === 'round-table' ? 'rounded-full' : 'rounded-2xl');
+
+                if (isTable) {
+                    const resizeHandle = document.createElement('div');
+                    resizeHandle.className = 'resize-handle';
+                    itemEl.appendChild(resizeHandle);
+                    
+                    const detailsContainer = document.createElement('div');
+                    detailsContainer.className = 'details-container';
+
+                    const namesCol = document.createElement('div');
+                    namesCol.className = 'details-column pr-1 border-r border-white/50';
+                    const ordersCol = document.createElement('div');
+                    ordersCol.className = 'details-column pl-1';
+
+                    if ((!obj.attendees || obj.attendees.length === 0) && (!obj.orders || obj.orders.length === 0)) {
+                        shapeEl.textContent = '0';
+                    } else {
+                        (obj.attendees || []).forEach(attendeeName => {
+                            const nameP = document.createElement('p');
+                            nameP.textContent = attendeeName || '-';
+                            namesCol.appendChild(nameP);
+                        });
+
+                        let tableTotalCost = 0;
+                        (obj.orders || []).forEach(order => {
+                            const orderP = document.createElement('p');
+                            orderP.textContent = `${order.name} ($${order.price.toFixed(2)})`;
+                            ordersCol.appendChild(orderP);
+                            tableTotalCost += order.price;
+                        });
+                        
+                        grandTotal += tableTotalCost;
+
+                        if (tableTotalCost > 0) {
+                            const separator = document.createElement('hr');
+                            separator.className = 'border-white/50 my-1';
+                            ordersCol.appendChild(separator);
+
+                            const totalP = document.createElement('p');
+                            totalP.className = 'font-bold';
+                            totalP.textContent = `Total: $${tableTotalCost.toFixed(2)}`;
+                            ordersCol.appendChild(totalP);
+                        }
+                    }
+                    detailsContainer.appendChild(namesCol);
+                    detailsContainer.appendChild(ordersCol);
+                    shapeEl.appendChild(detailsContainer);
+                }
+                
+                itemEl.appendChild(shapeEl);
+                const deleteIcon = document.createElement('div');
+                deleteIcon.className = 'delete-icon';
+                deleteIcon.innerHTML = '&times;';
+                itemEl.appendChild(deleteIcon);
+                floorplanEl.appendChild(itemEl);
+            });
+
+            document.getElementById('total-revenue').textContent = grandTotal.toFixed(2);
+        }
+
+        function renderTemplatePalette(templates) {
+            const container = document.getElementById('template-palette');
+            container.innerHTML = '';
+            if (!templates || templates.length === 0) {
+                 container.innerHTML = '<p class="text-xs text-gray-500 px-2">Save a table\'s size from its detail window to create a template.</p>';
+                 return;
+            }
+            templates.forEach(template => {
+                const div = document.createElement('div');
+                div.className = 'palette-item text-center';
+                div.draggable = true;
+                div.dataset.template = JSON.stringify(template);
+                
+                const shape = document.createElement('div');
+                shape.style.width = `${template.width}px`;
+                shape.style.height = `${template.height}px`;
+                shape.className = 'mx-auto shadow-md';
+                if (template.type === 'round-table') {
+                    shape.classList.add('bg-purple-500', 'rounded-full');
+                } else {
+                    shape.classList.add('bg-blue-500', 'rounded-2xl');
+                }
+                
+                const p = document.createElement('p');
+                p.className = 'text-sm mt-2 font-medium';
+                p.textContent = template.name;
+                
+                div.appendChild(shape);
+                div.appendChild(p);
+                container.appendChild(div);
+            });
+        }
+
+        // --- INTERACTION LOGIC ---
+        floorplanEl.addEventListener('mousedown', (e) => {
+            const targetItem = e.target.closest('.placed-item');
+            if (!targetItem) {
+                selectedObjectId = null;
+                renderFloorplan(currentPlanObjects);
+                return;
+            }
+
+            const activeItemId = targetItem.dataset.id;
+            if (e.target.classList.contains('delete-icon')) {
+                deleteObject(activeItemId);
+                return;
+            }
+            
+            e.preventDefault();
+
+            let actionType = e.target.classList.contains('resize-handle') ? 'resize' : 'drag';
+            const initialX = e.clientX, initialY = e.clientY;
+            const itemRect = targetItem.getBoundingClientRect();
+            let initialWidth, initialHeight, dragOffsetX, dragOffsetY;
+
+            if (actionType === 'resize') {
+                initialWidth = itemRect.width;
+                initialHeight = itemRect.height;
+            } else {
+                dragOffsetX = e.clientX - itemRect.left;
+                dragOffsetY = e.clientY - itemRect.top;
+            }
+            
+            let hasMoved = false;
+            const onMouseMove = (moveEvent) => {
+                hasMoved = true;
+                const itemEl = floorplanEl.querySelector(`[data-id='${activeItemId}']`);
+                if (!itemEl) return;
+
+                if (actionType === 'resize') {
+                    const dx = moveEvent.clientX - initialX, dy = moveEvent.clientY - initialY;
+                    const object = currentPlanObjects.find(o => o.id === activeItemId);
+                    let newWidth = initialWidth + dx, newHeight = initialHeight + dy;
+                    if (object.type === 'round-table') newWidth = newHeight = Math.max(newWidth, newHeight);
+                    itemEl.style.width = `${Math.max(30, newWidth)}px`;
+                    itemEl.style.height = `${Math.max(30, newHeight)}px`;
+                } else {
+                    const floorplanRect = floorplanEl.getBoundingClientRect();
+                    const x = moveEvent.clientX - floorplanRect.left + floorplanEl.scrollLeft - dragOffsetX;
+                    const y = moveEvent.clientY - floorplanRect.top + floorplanEl.scrollTop - dragOffsetY;
+                    itemEl.style.left = `${x}px`;
+                    itemEl.style.top = `${y}px`;
+                }
+            };
+
+            const onMouseUp = async () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+
+                if (hasMoved) {
+                    const itemEl = floorplanEl.querySelector(`[data-id='${activeItemId}']`);
+                    if (itemEl) {
+                        const updatedObjects = currentPlanObjects.map(obj => {
+                            if (obj.id === activeItemId) {
+                                return actionType === 'resize'
+                                    ? { ...obj, width: parseInt(itemEl.style.width), height: parseInt(itemEl.style.height) }
+                                    : { ...obj, x: parseInt(itemEl.style.left), y: parseInt(itemEl.style.top) };
+                            }
+                            return obj;
+                        });
+                        await updateDoc(doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId), { objects: updatedObjects });
+                    }
+                } else {
+                    selectedObjectId = activeItemId;
+                    renderFloorplan(currentPlanObjects);
+                    const clickedObject = currentPlanObjects.find(obj => obj.id === activeItemId);
+                    if (clickedObject && (clickedObject.type === 'square-table' || clickedObject.type === 'round-table')) {
+                        openModal('table-details-modal', activeItemId);
+                    }
+                }
+            };
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+
+        // --- PALETTE & OBJECT CREATION ---
+        document.getElementById('palette').addEventListener('dragstart', (e) => {
+            const target = e.target.closest('.palette-item');
+            if (target.dataset.template) {
+                e.dataTransfer.setData('application/json', target.dataset.template);
+            } else {
+                e.dataTransfer.setData('text/plain', target.dataset.type);
+            }
+        });
+        floorplanEl.addEventListener('dragover', (e) => e.preventDefault());
+        floorplanEl.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            if (!currentPlanId) return;
+            
+            const floorplanRect = floorplanEl.getBoundingClientRect();
+            const x = e.clientX - floorplanRect.left + floorplanEl.scrollLeft;
+            const y = e.clientY - floorplanRect.top + floorplanEl.scrollTop;
+
+            let newObject;
+            const templateData = e.dataTransfer.getData('application/json');
+            if (templateData) {
+                const template = JSON.parse(templateData);
+                newObject = { ...template, x, y, id: crypto.randomUUID(), attendees: [], orders: [] };
+            } else {
+                const type = e.dataTransfer.getData('text/plain');
+                if (!type) return;
+                newObject = { id: crypto.randomUUID(), type, x, y };
+                 if (type === 'square-table' || type === 'round-table') {
+                    Object.assign(newObject, { attendees: [], orders: [], width: 80, height: 80 });
+                }
+            }
+            await updateDoc(doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId), { objects: arrayUnion(newObject) });
+        });
+
+        async function deleteObject(objectId) {
+            if (!currentPlanId || !objectId) return;
+            const objectToDelete = currentPlanObjects.find(obj => obj.id === objectId);
+            if(objectToDelete) {
+                await updateDoc(doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId), { objects: arrayRemove(objectToDelete) });
+            }
+        }
+        
+        // --- MODAL HANDLING ---
+        function hideAllModals() {
+            document.querySelectorAll('.modal').forEach(modal => modal.classList.remove('show'));
+            document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.classList.remove('show'));
+        }
+
+        function openModal(modalId, tableId = null) {
+            hideAllModals(); 
+            if (tableId) activeTableId = tableId;
+            
+            const table = currentPlanObjects.find(o => o.id === activeTableId);
+
+            if (modalId === 'table-details-modal' && table) {
+                renderAttendeeDetailsList(table.attendees || []);
+                renderOrderDetailsList(table.orders || []);
+                populateOrderDropdown();
+                document.getElementById('table-status').value = table.status || 'Open';
+            } else if (modalId === 'menu-modal') {
+                renderMenuList(currentPlanMenu);
+            }
+            
+            const modal = document.getElementById(modalId);
+            const backdrop = document.getElementById(modalId + '-backdrop');
+            if (modal && backdrop) {
+                modal.classList.add('show');
+                backdrop.classList.add('show');
+            }
+        }
+
+        document.addEventListener('click', (e) => {
+            const target = e.target;
+            if (target.dataset.action === 'close-modal') hideAllModals();
+            if (target.id === 'new-plan-btn') openModal('new-plan-modal');
+            if (target.id === 'manage-menu-btn') openModal('menu-modal');
+        });
+
+        document.getElementById('new-plan-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const planName = document.getElementById('plan-name').value.trim();
+            if (planName) {
+                const newPlanDoc = await addDoc(floorplansCollectionRef, { name: planName, objects: [], menu: [], templates: [] });
+                await loadFloorplans();
+                switchFloorplan(newPlanDoc.id);
+                hideAllModals();
+            }
+        });
+        
+        // --- ATTENDEE & ORDER LOGIC ---
+        function renderAttendeeDetailsList(attendees) {
+            const listEl = document.getElementById('attendee-list');
+            listEl.innerHTML = '';
+            if (attendees.length === 0) {
+                listEl.innerHTML = '<p class="text-gray-500 text-sm">No attendees yet.</p>';
+            } else {
+                attendees.forEach((attendeeName, index) => {
+                    const li = document.createElement('div');
+                    li.className = 'flex justify-between items-center bg-gray-100 p-2 rounded gap-2';
+                    
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'font-semibold';
+                    nameSpan.textContent = attendeeName;
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.innerHTML = '&times;';
+                    deleteBtn.className = 'text-red-500 font-bold text-lg leading-none px-2';
+                    deleteBtn.onclick = async () => {
+                        const table = currentPlanObjects.find(o => o.id === activeTableId);
+                        const updatedAttendees = table.attendees.filter((_, i) => i !== index);
+                        const updatedObjects = currentPlanObjects.map(obj => obj.id === activeTableId ? { ...obj, attendees: updatedAttendees } : obj);
+                        await updateDoc(doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId), { objects: updatedObjects });
+                    };
+                    
+                    li.appendChild(nameSpan);
+                    li.appendChild(deleteBtn);
+                    listEl.appendChild(li);
+                });
+            }
+        }
+
+        function renderOrderDetailsList(orders) {
+            const listEl = document.getElementById('order-list');
+            listEl.innerHTML = '';
+            if (orders.length === 0) {
+                listEl.innerHTML = '<p class="text-gray-500 text-sm">No orders yet.</p>';
+            } else {
+                orders.forEach((order, index) => {
+                    const li = document.createElement('div');
+                    li.className = 'flex justify-between items-center bg-gray-100 p-2 rounded';
+                    li.innerHTML = `<span>${order.name} - $${order.price.toFixed(2)}</span>`;
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.innerHTML = '&times;';
+                    deleteBtn.className = 'text-red-500 font-bold text-lg leading-none px-2';
+                    deleteBtn.onclick = async () => {
+                        const table = currentPlanObjects.find(o => o.id === activeTableId);
+                        const updatedOrders = table.orders.filter((_, i) => i !== index);
+                        const updatedObjects = currentPlanObjects.map(obj => obj.id === activeTableId ? { ...obj, orders: updatedOrders } : obj);
+                        await updateDoc(doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId), { objects: updatedObjects });
+                    };
+                    li.appendChild(deleteBtn);
+                    listEl.appendChild(li);
+                });
+            }
+        }
+        
+        function populateOrderDropdown() {
+            const selectEl = document.getElementById('new-order-item');
+            const quickAddContainer = document.getElementById('quick-add-container');
+            selectEl.innerHTML = '';
+            quickAddContainer.innerHTML = '';
+
+             if (currentPlanMenu.length === 0) {
+                selectEl.innerHTML = '<option value="">Add items in Menu Manager</option>';
+                return;
+            }
+            currentPlanMenu.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.name;
+                option.textContent = `${item.name} - $${item.price.toFixed(2)}`;
+                option.dataset.price = item.price;
+                selectEl.appendChild(option);
+
+                if (item.favorite) {
+                    const quickAddBtn = document.createElement('button');
+                    quickAddBtn.type = 'button';
+                    quickAddBtn.className = 'text-xs bg-purple-100 text-purple-800 font-medium py-1 px-2 rounded-full hover:bg-purple-200';
+                    quickAddBtn.textContent = `+ ${item.name}`;
+                    quickAddBtn.onclick = () => {
+                        const newOrder = { name: item.name, price: item.price };
+                        const table = currentPlanObjects.find(o => o.id === activeTableId);
+                        const updatedOrders = [...(table.orders || []), newOrder];
+                        const updatedObjects = currentPlanObjects.map(obj => obj.id === activeTableId ? { ...obj, orders: updatedOrders } : obj);
+                        updateDoc(doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId), { objects: updatedObjects });
+                    };
+                    quickAddContainer.appendChild(quickAddBtn);
+                }
+            });
+        }
+
+        document.getElementById('add-attendee-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nameInput = document.getElementById('new-attendee-name');
+            const name = nameInput.value.trim();
+
+            if (name) {
+                const table = currentPlanObjects.find(o => o.id === activeTableId);
+                const updatedAttendees = [...(table.attendees || []), name];
+                const updatedObjects = currentPlanObjects.map(obj => obj.id === activeTableId ? { ...obj, attendees: updatedAttendees } : obj);
+                await updateDoc(doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId), { objects: updatedObjects });
+                nameInput.value = '';
+            }
+        });
+
+        document.getElementById('add-order-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const orderSelect = document.getElementById('new-order-item');
+            if (orderSelect.value) {
+                const selectedOption = orderSelect.options[orderSelect.selectedIndex];
+                const newOrder = { 
+                    name: selectedOption.value,
+                    price: parseFloat(selectedOption.dataset.price)
+                };
+                const table = currentPlanObjects.find(o => o.id === activeTableId);
+                const updatedOrders = [...(table.orders || []), newOrder];
+                const updatedObjects = currentPlanObjects.map(obj => obj.id === activeTableId ? { ...obj, orders: updatedOrders } : obj);
+                await updateDoc(doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId), { objects: updatedObjects });
+            }
+        });
+
+        document.getElementById('clear-table-btn').addEventListener('click', async () => {
+            if (activeTableId) {
+                const updatedObjects = currentPlanObjects.map(obj => {
+                    if (obj.id === activeTableId) {
+                        return { ...obj, attendees: [], orders: [], status: 'Open' };
+                    }
+                    return obj;
+                });
+                await updateDoc(doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId), { objects: updatedObjects });
+            }
+        });
+
+        document.getElementById('table-status').addEventListener('change', async (e) => {
+            if (activeTableId) {
+                const newStatus = e.target.value;
+                const updatedObjects = currentPlanObjects.map(obj => {
+                    if (obj.id === activeTableId) {
+                        return { ...obj, status: newStatus };
+                    }
+                    return obj;
+                });
+                await updateDoc(doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId), { objects: updatedObjects });
+            }
+        });
+
+        document.getElementById('save-template-btn').addEventListener('click', async () => {
+            const templateName = prompt("Enter a name for this template:");
+            if (templateName && activeTableId) {
+                const table = currentPlanObjects.find(o => o.id === activeTableId);
+                const newTemplate = {
+                    name: templateName,
+                    type: table.type,
+                    width: table.width,
+                    height: table.height
+                };
+                const updatedTemplates = [...currentPlanTemplates, newTemplate];
+                await updateDoc(doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId), { templates: updatedTemplates });
+            }
+        });
+
+        // --- MENU MANAGEMENT LOGIC ---
+        function renderMenuList(menu) {
+            const listEl = document.getElementById('menu-item-list');
+            listEl.innerHTML = '';
+            if (menu.length === 0) {
+                listEl.innerHTML = '<p class="text-gray-500 text-sm">No menu items added yet.</p>';
+            } else {
+                menu.forEach((item, index) => {
+                    const li = document.createElement('div');
+                    li.className = 'flex justify-between items-center bg-gray-100 p-2 rounded';
+                    
+                    const star = document.createElement('span');
+                    star.className = 'favorite-star text-xl';
+                    star.innerHTML = '&#9733;';
+                    if (item.favorite) star.classList.add('favorited');
+                    star.onclick = async () => {
+                        const updatedMenu = currentPlanMenu.map((m, i) => i === index ? { ...m, favorite: !m.favorite } : m);
+                        await updateDoc(doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId), { menu: updatedMenu });
+                    };
+
+                    const itemInfo = document.createElement('span');
+                    itemInfo.innerHTML = `<span class="font-semibold">${item.name}</span> - $${item.price.toFixed(2)}`;
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.innerHTML = '&times;';
+                    deleteBtn.className = 'text-red-500 font-bold text-lg leading-none px-2';
+                    deleteBtn.onclick = async () => {
+                        const updatedMenu = currentPlanMenu.filter((_, i) => i !== index);
+                        await updateDoc(doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId), { menu: updatedMenu });
+                    };
+                    
+                    const leftDiv = document.createElement('div');
+                    leftDiv.className = 'flex items-center gap-2';
+                    leftDiv.appendChild(star);
+                    leftDiv.appendChild(itemInfo);
+
+                    li.appendChild(leftDiv);
+                    li.appendChild(deleteBtn);
+                    listEl.appendChild(li);
+                });
+            }
+        }
+
+        document.getElementById('add-menu-item-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nameInput = document.getElementById('new-menu-item-name');
+            const priceInput = document.getElementById('new-menu-item-price');
+            const name = nameInput.value.trim();
+            const price = parseFloat(priceInput.value);
+
+            if (name && !isNaN(price)) {
+                const newItem = { name, price, favorite: false };
+                const updatedMenu = [...currentPlanMenu, newItem];
+                await updateDoc(doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId), { menu: updatedMenu });
+                nameInput.value = '';
+                priceInput.value = '';
+            }
+        });
+
+        // --- GLOBAL & AUTH ---
+        document.getElementById('delete-plan-btn').addEventListener('click', async () => {
+            if (currentPlanId && confirm(`Are you sure you want to delete this plan?`)) {
+                await deleteDoc(doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId));
+            }
+        });
+
+        document.addEventListener('keydown', async (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'c' && selectedObjectId) {
+                    const objectToCopy = currentPlanObjects.find(obj => obj.id === selectedObjectId);
+                    if (objectToCopy) {
+                        clipboard = { ...objectToCopy };
+                        delete clipboard.id;
+                    }
+                } else if (e.key === 'v' && clipboard) {
+                    const newObject = {
+                        ...clipboard,
+                        id: crypto.randomUUID(),
+                        x: clipboard.x + 20,
+                        y: clipboard.y + 20,
+                        attendees: [],
+                        orders: []
+                    };
+                    await updateDoc(doc(db, `artifacts/${appId}/public/data/floorplans`, currentPlanId), { objects: arrayUnion(newObject) });
+                }
+            }
+        });
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                console.log("Auth state is 'signed in'.");
+                loadFloorplans();
+            } else {
+                console.log("Auth state is 'signed out'. Attempting sign-in...");
+                const signIn = initialAuthToken ? signInWithCustomToken(auth, initialAuthToken) : signInAnonymously(auth);
+                signIn.catch(error => {
+                    console.error("Sign-in failed:", error);
+                    floorplanEl.innerHTML = `<p class="text-center text-red-500 p-8">Error: Could not connect to the database.</p>`;
+                });
+            }
+        });
+    </script>
+</body>
+</html>
