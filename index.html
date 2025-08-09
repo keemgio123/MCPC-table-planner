@@ -186,8 +186,27 @@
 
         // --- CONFIG & STATE ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-floorplan-app';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyC7syeIjI5ZMaEr7Vnj1qPT8JDQOvuWFbY",
+  authDomain: "mcpc-pla.firebaseapp.com",
+  projectId: "mcpc-pla",
+  storageBucket: "mcpc-pla.firebasestorage.app",
+  messagingSenderId: "777736794716",
+  appId: "1:777736794716:web:0d77ce2eed14b731232c99",
+  measurementId: "G-GJ3ZL1K3Z6"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         setLogLevel('debug');
 
         let currentPlanId = null;
