@@ -20,6 +20,11 @@
         .placed-item {
             position: absolute; display: flex; align-items: center; justify-content: center; user-select: none;
             border: 2px solid transparent;
+            transition: opacity 0.3s ease-out;
+        }
+        .placed-item.deleting {
+            opacity: 0;
+            transform: scale(0.9);
         }
         .placed-item.selected {
             border-color: #fb923c;
